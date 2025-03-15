@@ -8,13 +8,10 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 import time
 
-# TBA API anahtarınızı girin
 TBA_AUTH_KEY = "D58izqXU2LkInbiq8oBNgZIhzBrae8crytaz0OrSKegE5fypwATQ31Ibebx4l6yv".strip()
 tba = tbapy.TBA(TBA_AUTH_KEY)
 
-# -------------------------------------------------------------------
-# 1. Model Eğitimi: Geçmişteki bir etkinlikten (2025tuhc) verileri çekip modeli eğitiyoruz
-# -------------------------------------------------------------------
+
 training_event_key = "2025tuhc"
 teams_train = tba.event_teams(training_event_key)
 rankings_train = tba.event_rankings(training_event_key)
@@ -30,15 +27,13 @@ for team in teams_train:
     team_num = team.team_number
     train_team_numbers.append(team_num)
     
-    # Takımın sıralama bilgisini bulalım
     team_rank = None
     for r in rankings_train["rankings"]:
         if r["team_key"] == "frc" + str(team_num):
             team_rank = r["rank"]
             break
     train_ranks.append(team_rank)
-    
-    # OPR, DPR, CCWM verilerini al (bulunamazsa 0 değeri kullanılır)
+
     team_opr = oprs_train["oprs"].get("frc" + str(team_num), 0)
     team_dpr = oprs_train["dprs"].get("frc" + str(team_num), 0)
     team_ccwm = abs(oprs_train["ccwms"].get("frc" + str(team_num), 0))
@@ -69,17 +64,10 @@ train_preds = model.predict(X_train_scaled)
 train_mse = mean_squared_error(y_train_data, train_preds)
 print("Training MSE:", train_mse)
 
-# -------------------------------------------------------------------
-# 2. Regional'a katılacak takımları ayrı ayrı araştır: Her takımın geçmiş performans ortalamasını hesapla
-# -------------------------------------------------------------------
-regional_event_key = "2025flwp"  # Regional etkinliğin kodu (gerekirse güncelleyiniz)
+regional_event_key = "2025flwp" 
 teams_regional = tba.event_teams(regional_event_key)
 
 def get_team_avg_metrics(team_key, current_event_key, year="2025"):
-    """
-    Belirtilen takımın yıl içindeki diğer etkinliklerden OPR, DPR, CCWM ortalamasını hesaplar.
-    Mevcut regional etkinliği atlanır.
-    """
     try:
         events = tba.team_events(team_key, year=year)
     except Exception:
@@ -96,7 +84,7 @@ def get_team_avg_metrics(team_key, current_event_key, year="2025"):
                 ccwm_list.append(abs(event_oprs["ccwms"][team_key]))
         except Exception:
             continue
-        time.sleep(0.2)  # API rate limit koruması
+        time.sleep(0.2)
     if opr_list:
         return np.mean(opr_list), np.mean(dpr_list), np.mean(ccwm_list)
     else:
@@ -122,9 +110,7 @@ df_regional = pd.DataFrame({
     "CCWM": regional_ccwms
 })
 
-# -------------------------------------------------------------------
-# 3. Her takım için tahmin: Hesaplanan ortalamaları kullanarak model ile final sıralaması tahminini yap
-# -------------------------------------------------------------------
+
 X_regional = df_regional[["OPR", "DPR", "CCWM"]]
 X_regional_scaled = scaler.transform(X_regional)
 predicted_ranks = model.predict(X_regional_scaled)
@@ -132,9 +118,7 @@ df_regional["Predicted Rank"] = predicted_ranks
 
 print(df_regional)
 
-# -------------------------------------------------------------------
-# 4. Sonuçları görselleştir: Her takımın tahmin edilen performansını gösteren grafik
-# -------------------------------------------------------------------
+
 fig = go.Figure(data=go.Scatter(
     x = df_regional["OPR"],
     y = predicted_ranks,
